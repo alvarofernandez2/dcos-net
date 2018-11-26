@@ -68,10 +68,11 @@ request(Method, Request, HTTPOptions, Opts) ->
     URIPath = element(1, Request),
     Headers = element(2, Request),
     URI = mesos_uri(URIPath),
-    Headers0 = maybe_add_token(Headers),
+    Headers0 = maybe_add_auth(Headers),
     Headers1 = add_useragent(Headers0),
     Request0 = setelement(1, Request, URI),
     Request1 = setelement(2, Request0, Headers1),
+    lager:error("Request1: ~p", [Request1]),
     httpc:request(Method, Request1, mesos_http_options(HTTPOptions), Opts).
 
 %%%===================================================================
@@ -87,18 +88,29 @@ handle_response({ok, {_StatusLine = {_HTTPVersion, 200 = _StatusCode, _ReasonPhr
 handle_response({ok, {StatusLine, _Headers, _Body}}) ->
     {error, StatusLine}.
 
--spec(format_token(string()) -> string()).
-format_token(AuthToken) ->
-    lists:flatten("token=" ++ AuthToken).
+-spec(format_auth_header(string(), string()) -> string()).
+format_auth_header(AuthType, AuthCredentials) ->
+    lists:flatten([AuthType, AuthCredentials]).
 
--spec(maybe_add_token(httpc:headers()) -> httpc:headers()).
-maybe_add_token(Headers) ->
-    case os:getenv("SERVICE_AUTH_TOKEN") of
+-spec(maybe_add_auth_header(httpc:headers(), string(), string()) -> httpc:headers()).
+maybe_add_auth_header(Headers, AuthType, AuthEnvVar) ->
+    case os:getenv(AuthEnvVar) of
         false ->
             Headers;
-        AuthToken0 ->
-            AuthToken1 = format_token(AuthToken0),
-            [{"Authorization", AuthToken1}|Headers]
+        AuthCredentials0 ->
+            AuthCredentials1 = format_auth_header(AuthType, AuthCredentials0),
+            [{"Authorization", AuthCredentials1}|Headers]
+    end.
+
+-spec(maybe_add_auth(httpc:headers()) -> httpc:headers()).
+maybe_add_auth(Headers) ->
+    case os:getenv("SERVICE_AUTH_TYPE") of
+        false ->
+            Headers;
+        "Token" ->
+            maybe_add_auth_header(Headers, "token=", "SERVICE_AUTH_TOKEN");
+        "Basic" ->
+            maybe_add_auth_header(Headers, "Basic ", "SERVICE_AUTH_BASIC_CREDENTIALS_BASE64")
     end.
 
 -spec(add_useragent(httpc:headers()) -> httpc:headers()).
