@@ -102,7 +102,6 @@ request(Method, Request, HTTPOptions, Opts) ->
     Headers1 = add_useragent(Headers0),
     Request0 = setelement(1, Request, URI),
     Request1 = setelement(2, Request0, Headers1),
-    lager:error("Request1: ~p", [Request1]),
     httpc:request(Method, Request1, mesos_http_options(HTTPOptions), Opts).
 
 -spec(handle_response({ok, response()} | {error, Reason :: term()}) ->
